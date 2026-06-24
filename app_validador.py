@@ -11,7 +11,7 @@ st.markdown("""
     🔍 Validador de Listas de Materiales
 </h1>
 <p style="text-align: center; color: #666;">
-    Busca en TODAS las columnas de BBDD y suma cantidades
+    MVP: Validar QUÉ HAY y QUÉ NO HAY en BBDD
 </p>
 """, unsafe_allow_html=True)
 
@@ -22,252 +22,182 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.markdown("### 📊 SolidWorks")
-    st.caption("Columna 2 = Ref a buscar")
-    sw_file = st.file_uploader("Carga tu SolidWorks", type=["xlsx", "xls", "csv"], key="sw")
+    st.caption("Col 2 = Referencia (a buscar)\nCol 3 = Cantidad")
+    sw_file = st.file_uploader("Carga SolidWorks", type=["xlsx", "xls", "csv"], key="sw")
     sw_data = None
     if sw_file:
         try:
             sw_data = pd.read_excel(sw_file) if not sw_file.name.endswith('.csv') else pd.read_csv(sw_file)
             st.success(f"✅ {sw_file.name}")
-            st.caption(f"Filas: {len(sw_data)} | Cols: {len(sw_data.columns)}")
+            st.caption(f"Filas: {len(sw_data)}")
+            with st.expander("Ver datos"):
+                st.dataframe(sw_data.head(5), use_container_width=True)
         except Exception as e:
             st.error(f"Error: {e}")
 
 with col2:
     st.markdown("### 🗄️ Base de Datos")
     st.caption("Buscará en TODAS las columnas")
-    bbdd_file = st.file_uploader("Carga tu BBDD", type=["xlsx", "xls", "csv"], key="bbdd")
+    bbdd_file = st.file_uploader("Carga BBDD", type=["xlsx", "xls", "csv"], key="bbdd")
     bbdd_data = None
     if bbdd_file:
         try:
             bbdd_data = pd.read_excel(bbdd_file) if not bbdd_file.name.endswith('.csv') else pd.read_csv(bbdd_file)
             st.success(f"✅ {bbdd_file.name}")
-            st.caption(f"Filas: {len(bbdd_data)} | Cols: {len(bbdd_data.columns)}")
+            st.caption(f"Filas: {len(bbdd_data)}")
+            with st.expander("Ver datos"):
+                st.dataframe(bbdd_data.head(5), use_container_width=True)
         except Exception as e:
             st.error(f"Error: {e}")
 
 # VALIDAR
 if sw_data is not None and bbdd_data is not None:
     st.divider()
-    st.markdown("## 🚀 Validación")
     
     # Verificar columnas
     sw_cols = list(sw_data.columns)
-    bbdd_cols = list(bbdd_data.columns)
     
-    col1, col2 = st.columns(2)
-    with col1:
-        if len(sw_cols) >= 2:
-            sw_col = sw_cols[1]
-            st.info(f"📊 SolidWorks Columna 2: **{sw_col}**")
-        else:
-            st.error("SolidWorks necesita al menos 2 columnas")
-            sw_data = None
-    
-    with col2:
-        # Buscar columna de cantidad en BBDD
-        cant_col = None
-        for col in bbdd_cols:
-            if 'cant' in str(col).lower():
-                cant_col = col
-                break
+    if len(sw_cols) < 3:
+        st.error("❌ SolidWorks necesita al menos 3 columnas")
+    else:
+        col_ref = sw_cols[1]  # Columna 2
+        col_qty = sw_cols[2]  # Columna 3
         
-        if cant_col:
-            st.info(f"🗄️ BBDD Columna de Cantidad: **{cant_col}**\n\nBuscará la referencia en TODAS las columnas")
-        else:
-            st.warning("⚠️ No encontré columna de cantidad en BBDD")
-    
-    st.divider()
-    
-    if st.button("🚀 VALIDAR", use_container_width=True, type="primary"):
-        with st.spinner("Validando... buscando en todas las columnas y sumando cantidades"):
-            
-            # PROCESAR SOLIDWORKS
-            sw_elements = []
-            for idx, row in sw_data.iterrows():
-                try:
-                    ref = str(row[sw_col]).strip() if pd.notna(row[sw_col]) else ""
-                    cols = list(row.index)
-                    col1 = str(row[cols[0]]).strip() if pd.notna(row[cols[0]]) else ""
-                    col3 = str(row[cols[2]]).strip() if len(cols) > 2 and pd.notna(row[cols[2]]) else ""
-                    qty = int(row[cols[3]]) if len(cols) > 3 and pd.notna(row[cols[3]]) else 1
-                    
-                    if ref:
-                        sw_elements.append({
-                            'col1': col1,
-                            'ref': ref.strip(),
-                            'ref_lower': ref.lower().strip(),
-                            'desc': col3,
-                            'qty': qty
-                        })
-                except:
-                    pass
-            
-            st.info(f"✅ SolidWorks: {len(sw_elements)} elementos leídos")
-            
-            # PROCESAR BBDD - BUSCAR EN TODAS LAS COLUMNAS
-            bbdd_encontrados = {}  # {ref: {'qty_total': X, 'filas': Y}}
-            
-            for idx, row in bbdd_data.iterrows():
-                try:
-                    # Obtener cantidad
-                    qty = 0
-                    if cant_col and pd.notna(row[cant_col]):
-                        qty = int(row[cant_col])
-                    
-                    # BUSCAR LA REFERENCIA EN TODAS LAS COLUMNAS
-                    for col in bbdd_cols:
-                        celda = str(row[col]).strip().lower() if pd.notna(row[col]) else ""
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info(f"📊 SolidWorks:\n  Col 2 (Ref): **{col_ref}**\n  Col 3 (Qty): **{col_qty}**")
+        with col2:
+            st.info(f"🗄️ BBDD:\n  Buscará **{col_ref}**\n  en TODAS las columnas")
+        
+        st.divider()
+        
+        if st.button("🚀 VALIDAR", use_container_width=True, type="primary"):
+            with st.spinner("Validando..."):
+                
+                # LEER SOLIDWORKS
+                referencias_sw = []
+                for idx, row in sw_data.iterrows():
+                    try:
+                        ref = str(row[col_ref]).strip() if pd.notna(row[col_ref]) else ""
+                        qty = int(row[col_qty]) if pd.notna(row[col_qty]) else 1
                         
-                        # Buscar si esta celda coincide con alguna ref de SolidWorks
-                        for sw in sw_elements:
-                            sw_ref_lower = sw['ref_lower']
-                            
-                            # Búsqueda exacta o parcial
-                            if (celda == sw_ref_lower or 
-                                sw_ref_lower in celda or 
-                                celda in sw_ref_lower):
-                                
-                                # Registrar este hallazgo
-                                if sw['ref'] not in bbdd_encontrados:
-                                    bbdd_encontrados[sw['ref']] = {
-                                        'qty_total': 0,
-                                        'filas': []
-                                    }
-                                
-                                bbdd_encontrados[sw['ref']]['qty_total'] += qty
-                                bbdd_encontrados[sw['ref']]['filas'].append({
-                                    'fila': idx + 2,
-                                    'columna': col,
-                                    'qty': qty
-                                })
+                        if ref:
+                            referencias_sw.append({
+                                'referencia': ref,
+                                'cantidad_sw': qty,
+                                'encontrado': False
+                            })
+                    except:
+                        pass
+                
+                # BUSCAR EN BBDD
+                bbdd_referencias = set()
+                for idx, row in bbdd_data.iterrows():
+                    for col in bbdd_data.columns:
+                        celda = str(row[col]).strip().lower() if pd.notna(row[col]) else ""
+                        for ref_obj in referencias_sw:
+                            if celda == ref_obj['referencia'].lower():
+                                ref_obj['encontrado'] = True
+                                bbdd_referencias.add(ref_obj['referencia'].lower())
                                 break
                 
-                except:
-                    pass
-            
-            st.info(f"✅ BBDD: Elementos encontrados y cantidades sumadas")
-            
-            # COMPARAR
-            consolidado = []
-            discrepancias = []
-            
-            for sw in sw_elements:
-                ref = sw['ref']
-                sw_qty = sw['qty']
+                # CREAR RESULTADO
+                resultado = []
+                hay_count = 0
+                no_hay_count = 0
                 
-                if ref not in bbdd_encontrados:
-                    # NO ENCONTRADO
-                    estado = "✗ FALTA"
-                    accion = "NO existe en BBDD"
-                    bbdd_qty = "NO ENCONTRADO"
-                    discrepancias.append({
-                        'ref': ref,
-                        'tipo': 'FALTA',
-                        'qty_sw': sw_qty,
-                        'qty_bbdd': None
-                    })
-                else:
-                    # ENCONTRADO - COMPARAR CANTIDAD TOTAL
-                    bbdd_qty = bbdd_encontrados[ref]['qty_total']
+                for ref_obj in referencias_sw:
+                    if ref_obj['encontrado']:
+                        estado = "✓ HAY"
+                        severidad = "success"
+                        hay_count += 1
+                    else:
+                        estado = "✗ NO HAY"
+                        severidad = "error"
+                        no_hay_count += 1
                     
-                    if sw_qty == bbdd_qty:
-                        estado = "✓ OK"
-                        accion = f"Encontrado (Qty: {bbdd_qty})"
-                    else:
-                        estado = "⚠ QTY"
-                        accion = f"BBDD tiene {bbdd_qty}, SW tiene {sw_qty}"
-                        discrepancias.append({
-                            'ref': ref,
-                            'tipo': 'QTY',
-                            'qty_sw': sw_qty,
-                            'qty_bbdd': bbdd_qty
-                        })
+                    resultado.append({
+                        'Referencia': ref_obj['referencia'],
+                        'Cantidad SolidWorks': ref_obj['cantidad_sw'],
+                        'Estado': estado,
+                        'Severidad': severidad
+                    })
                 
-                consolidado.append({
-                    'Ref': ref,
-                    'Descripción': sw['desc'],
-                    'Qty SolidWorks': sw_qty,
-                    'Qty BBDD (Total)': bbdd_qty if ref in bbdd_encontrados else 'NO ENCONTRADO',
-                    'Estado': estado,
-                    'Acción': accion
-                })
+                st.session_state.resultado = resultado
+                st.session_state.hay_count = hay_count
+                st.session_state.no_hay_count = no_hay_count
+                st.session_state.validado = True
+        
+        # MOSTRAR RESULTADOS
+        if 'validado' in st.session_state:
+            st.divider()
+            st.markdown("## 📊 Resultados")
             
-            st.session_state.consolidado = consolidado
-            st.session_state.discrepancias = discrepancias
-            st.session_state.bbdd_encontrados = bbdd_encontrados
-            st.session_state.validado = True
-    
-    # MOSTRAR RESULTADOS
-    if 'validado' in st.session_state:
-        st.divider()
-        st.markdown("## 📊 Resultados")
-        
-        df = pd.DataFrame(st.session_state.consolidado)
-        ok = len([x for x in st.session_state.consolidado if '✓' in x['Estado']])
-        qty_diff = len([x for x in st.session_state.consolidado if '⚠' in x['Estado']])
-        falta = len([x for x in st.session_state.consolidado if '✗' in x['Estado']])
-        
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("📊 Total", len(st.session_state.consolidado))
-        col2.metric("✓ OK", ok)
-        col3.metric("⚠ Qty Diferente", qty_diff)
-        col4.metric("✗ No Encontrado", falta)
-        
-        if len(st.session_state.consolidado) > 0:
-            pct = (ok / len(st.session_state.consolidado) * 100)
-            st.markdown(f"### {pct:.1f}% de los elementos están correctos")
-        
-        st.divider()
-        
-        tab1, tab2, tab3 = st.tabs(["📋 Consolidado Completo", "🔴 Problemas", "✓ OK"])
-        
-        with tab1:
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            col1, col2, col3 = st.columns(3)
+            col1.metric("📊 Total Referencias", len(st.session_state.resultado))
+            col2.metric("✓ HAY en BBDD", st.session_state.hay_count)
+            col3.metric("✗ NO HAY en BBDD", st.session_state.no_hay_count)
             
-            col1, col2 = st.columns(2)
-            with col1:
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    df.to_excel(writer, sheet_name='Consolidado', index=False)
-                st.download_button(
-                    "📥 Descargar Excel",
-                    output.getvalue(),
-                    "Consolidado_Validacion.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
-            with col2:
-                st.download_button(
-                    "📥 Descargar CSV",
-                    df.to_csv(index=False),
-                    "Consolidado_Validacion.csv",
-                    "text/csv",
-                    use_container_width=True
-                )
-        
-        with tab2:
-            if st.session_state.discrepancias:
-                st.markdown(f"### {len(st.session_state.discrepancias)} Problemas Encontrados")
+            st.divider()
+            
+            # Crear DataFrame
+            df = pd.DataFrame(st.session_state.resultado)
+            
+            tab1, tab2, tab3 = st.tabs(["📋 Todas", "✓ HAY", "✗ NO HAY"])
+            
+            with tab1:
+                st.markdown("### Validación Completa")
                 
-                for d in st.session_state.discrepancias:
-                    if d['tipo'] == 'FALTA':
-                        st.error(f"❌ **{d['ref']}** - NO EXISTE en BBDD (SolidWorks requiere {d['qty_sw']} unidades)")
+                # Mostrar con colores
+                for idx, row in df.iterrows():
+                    if '✓' in row['Estado']:
+                        st.success(f"✓ **{row['Referencia']}** - Cantidad: {row['Cantidad SolidWorks']}")
                     else:
-                        st.warning(f"⚠️ **{d['ref']}** - Cantidad incorrecta:\n  • SolidWorks: {d['qty_sw']}\n  • BBDD (Total): {d['qty_bbdd']}")
-                    st.divider()
-            else:
-                st.success("✅ TODOS LOS ELEMENTOS TIENEN CANTIDAD CORRECTA")
-        
-        with tab3:
-            ok_items = [x for x in st.session_state.consolidado if '✓' in x['Estado']]
-            if ok_items:
-                st.markdown(f"### {len(ok_items)} Elementos Correctos ✓")
-                st.dataframe(pd.DataFrame(ok_items)[['Ref', 'Descripción', 'Qty SolidWorks', 'Qty BBDD (Total)']], 
-                           use_container_width=True, hide_index=True)
-            else:
-                st.info("No hay elementos perfectamente correctos")
+                        st.error(f"✗ **{row['Referencia']}** - Cantidad: {row['Cantidad SolidWorks']}")
+                
+                st.divider()
+                
+                # Descargar
+                col1, col2 = st.columns(2)
+                with col1:
+                    output = BytesIO()
+                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                        df.to_excel(writer, sheet_name='Validacion', index=False)
+                    st.download_button(
+                        "📥 Descargar Excel",
+                        output.getvalue(),
+                        "Validacion_MVP.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
+                with col2:
+                    st.download_button(
+                        "📥 Descargar CSV",
+                        df.to_csv(index=False),
+                        "Validacion_MVP.csv",
+                        "text/csv",
+                        use_container_width=True
+                    )
+            
+            with tab2:
+                df_hay = df[df['Estado'] == "✓ HAY"]
+                if len(df_hay) > 0:
+                    st.markdown(f"### {len(df_hay)} Referencias encontradas en BBDD ✓")
+                    for idx, row in df_hay.iterrows():
+                        st.success(f"✓ **{row['Referencia']}** - Qty: {row['Cantidad SolidWorks']}")
+                else:
+                    st.info("No hay referencias encontradas")
+            
+            with tab3:
+                df_no_hay = df[df['Estado'] == "✗ NO HAY"]
+                if len(df_no_hay) > 0:
+                    st.markdown(f"### {len(df_no_hay)} Referencias NO encontradas en BBDD ✗")
+                    st.warning("Estas referencias FALTA cargarlas en la BBDD:")
+                    for idx, row in df_no_hay.iterrows():
+                        st.error(f"✗ **{row['Referencia']}** - Qty: {row['Cantidad SolidWorks']}")
+                else:
+                    st.success("¡Todas las referencias están en la BBDD!")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: #999;'>🔍 v5.0 - Busca en todas las columnas y suma cantidades</p>", 
+st.markdown("<p style='text-align: center; color: #999;'>🔍 MVP v1 - QUÉ HAY y QUÉ NO HAY</p>", 
             unsafe_allow_html=True)
