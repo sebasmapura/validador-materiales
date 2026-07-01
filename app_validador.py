@@ -221,96 +221,78 @@ if sw_data is not None and (bbdd_proyecto is not None or bbdd_estatica is not No
             
             df = pd.DataFrame(st.session_state.resultado)
             
-            tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-                ["📋 TODAS", "✓ HAY", "📦 ELEMENTOS", "🏷️ ARTÍCULOS", "🔗 AMBOS", "✗ NO HAY"]
+            # MOSTRAR TABLA COMPLETA
+            st.markdown("### 📋 Validación Completa")
+            st.dataframe(df, use_container_width=True, hide_index=True)
+            
+            st.divider()
+            
+            # DESCARGAR
+            col1, col2 = st.columns(2)
+            with col1:
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df.to_excel(writer, sheet_name='Validacion', index=False)
+                st.download_button(
+                    "📥 Descargar Excel",
+                    output.getvalue(),
+                    "Validacion_Completa.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+            with col2:
+                st.download_button(
+                    "📥 Descargar CSV",
+                    df.to_csv(index=False),
+                    "Validacion_Completa.csv",
+                    "text/csv",
+                    use_container_width=True
+                )
+            
+            st.divider()
+            
+            # FILTROS POR TIPO
+            tab1, tab2, tab3, tab4, tab5 = st.tabs(
+                ["✓ HAY", "📦 ELEMENTOS", "🏷️ ARTÍCULOS", "🔗 AMBOS", "✗ NO HAY"]
             )
             
             with tab1:
-                st.markdown("### Validación Completa")
-                
-                for idx, row in df.iterrows():
-                    if row['Estado'] == "✓ HAY":
-                        if row['Tipo'] == "ELEMENTO":
-                            st.success(f"✓ **{row['Referencia']}** → 📦 ELEMENTO")
-                        elif row['Tipo'] == "ARTÍCULO":
-                            st.success(f"✓ **{row['Referencia']}** → 🏷️ ARTÍCULO")
-                        else:
-                            st.success(f"✓ **{row['Referencia']}** → 🔗 AMBOS")
-                    else:
-                        st.error(f"✗ **{row['Referencia']}** → NO HAY")
-                
-                st.divider()
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    output = BytesIO()
-                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                        df.to_excel(writer, sheet_name='Validacion', index=False)
-                    st.download_button(
-                        "📥 Descargar Excel",
-                        output.getvalue(),
-                        "Validacion_Completa.xlsx",
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True
-                    )
-                with col2:
-                    st.download_button(
-                        "📥 Descargar CSV",
-                        df.to_csv(index=False),
-                        "Validacion_Completa.csv",
-                        "text/csv",
-                        use_container_width=True
-                    )
-            
-            with tab2:
                 df_hay = df[df['Estado'] == "✓ HAY"]
                 if len(df_hay) > 0:
                     st.markdown(f"### ✓ {len(df_hay)} Referencias en BBDD")
-                    for idx, row in df_hay.iterrows():
-                        if row['Tipo'] == "ELEMENTO":
-                            st.success(f"✓ **{row['Referencia']}** → 📦 ELEMENTO")
-                        elif row['Tipo'] == "ARTÍCULO":
-                            st.success(f"✓ **{row['Referencia']}** → 🏷️ ARTÍCULO")
-                        else:
-                            st.success(f"✓ **{row['Referencia']}** → 🔗 AMBOS")
+                    st.dataframe(df_hay, use_container_width=True, hide_index=True)
                 else:
                     st.info("No hay referencias")
             
-            with tab3:
+            with tab2:
                 df_elementos = df[df['Tipo'] == "ELEMENTO"]
                 if len(df_elementos) > 0:
                     st.markdown(f"### 📦 {len(df_elementos)} Elementos en BBDD")
-                    for idx, row in df_elementos.iterrows():
-                        st.success(f"📦 **{row['Referencia']}** (ELEMENTO)")
+                    st.dataframe(df_elementos, use_container_width=True, hide_index=True)
                 else:
                     st.info("No hay elementos")
             
-            with tab4:
+            with tab3:
                 df_articulos = df[df['Tipo'] == "ARTÍCULO"]
                 if len(df_articulos) > 0:
                     st.markdown(f"### 🏷️ {len(df_articulos)} Artículos en BBDD")
-                    for idx, row in df_articulos.iterrows():
-                        st.success(f"🏷️ **{row['Referencia']}** (ARTÍCULO)")
+                    st.dataframe(df_articulos, use_container_width=True, hide_index=True)
                 else:
                     st.info("No hay artículos")
             
-            with tab5:
+            with tab4:
                 df_ambos = df[df['Tipo'] == "AMBOS"]
                 if len(df_ambos) > 0:
-                    st.markdown(f"### 🔗 {len(df_ambos)} Referencias en AMBOS (ELEMENTO + ARTÍCULO)")
-                    for idx, row in df_ambos.iterrows():
-                        st.success(f"🔗 **{row['Referencia']}** (AMBOS)")
+                    st.markdown(f"### 🔗 {len(df_ambos)} Referencias en AMBOS")
+                    st.dataframe(df_ambos, use_container_width=True, hide_index=True)
                 else:
                     st.info("No hay referencias en ambos")
             
-            with tab6:
+            with tab5:
                 df_no_hay = df[df['Estado'] == "✗ NO HAY"]
                 if len(df_no_hay) > 0:
                     st.markdown(f"### ✗ {len(df_no_hay)} Referencias NO en BBDD")
-                    st.error("**FALTA CARGAR EN BBDD:**")
-                    
-                    for idx, row in df_no_hay.iterrows():
-                        st.error(f"✗ **{row['Referencia']}**")
+                    st.dataframe(df_no_hay, use_container_width=True, hide_index=True)
                     
                     csv_faltantes = df_no_hay[['Referencia']].to_csv(index=False)
                     st.download_button(
