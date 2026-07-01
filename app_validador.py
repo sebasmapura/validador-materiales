@@ -49,7 +49,7 @@ st.markdown("## 🗄️ 3. BBDD Estática (desde GitHub)")
 
 bbdd_estatica = None
 try:
-    GITHUB_USER = "Ssebasmapura"  # ⚠️ CAMBIAR POR TU USUARIO
+    GITHUB_USER = "sebasmapura"  # ⚠️ CAMBIAR POR TU USUARIO
     REPO_NAME = "validador-materiales"
     
     url = f"https://raw.githubusercontent.com/{GITHUB_USER}/{REPO_NAME}/main/20260630ElementosTodos.xls"
