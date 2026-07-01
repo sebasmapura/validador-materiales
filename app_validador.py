@@ -12,7 +12,7 @@ st.markdown("""
     🔍 Validador de Materiales
 </h1>
 <p style="text-align: center; color: #666;">
-    Compara SolidWorks vs BBDD (Proyecto + Estática fusionadas)
+    SolidWorks vs BBDD Fusionada (Proyecto + Estática) | ELEMENTO/ARTÍCULO/AMBOS
 </p>
 """, unsafe_allow_html=True)
 
@@ -32,7 +32,7 @@ if sw_file:
 
 # ============= 2. BBDD PROYECTO =============
 st.divider()
-st.markdown("## 📁 2. BBDD Proyecto (cargar)")
+st.markdown("## 📁 2. BBDD Proyecto")
 bbdd_proyecto_file = st.file_uploader("Carga BBDD Proyecto actual", type=["xlsx", "xls", "csv"], key="bbdd_proj")
 bbdd_proyecto = None
 
@@ -43,13 +43,13 @@ if bbdd_proyecto_file:
     except Exception as e:
         st.error(f"Error: {e}")
 
-# ============= 3. BBDD ESTÁTICA (desde GitHub) =============
+# ============= 3. BBDD ESTÁTICA (GitHub) =============
 st.divider()
 st.markdown("## 🗄️ 3. BBDD Estática (desde GitHub)")
 
 bbdd_estatica = None
 try:
-    GITHUB_USER = "sebasmapura"  # ⚠️ CAMBIAR POR TU USUARIO
+    GITHUB_USER = "Ssebasmapura"  # ⚠️ CAMBIAR POR TU USUARIO
     REPO_NAME = "validador-materiales"
     
     url = f"https://raw.githubusercontent.com/{GITHUB_USER}/{REPO_NAME}/main/20260630ElementosTodos.xls"
@@ -88,13 +88,16 @@ if sw_data is not None and (bbdd_proyecto is not None or bbdd_estatica is not No
         🗄️  **BBDD Fusionada:**
         {bbdd_info}
         
-        ⚡ Búsqueda: Se compararán todas las referencias contra BBDD fusionada
+        ⚡ Clasificación:
+        - Elementos.ref_empresa (Proyecto) → 📦 ELEMENTO
+        - Proyectos.ref_empresa (Proyecto) → 🏷️ ARTÍCULO
+        - RefEmpresa (Estática) → 📦 ELEMENTO
         """)
         
         st.divider()
         
         if st.button("🔍 VALIDAR", use_container_width=True, type="primary"):
-            with st.spinner("Validando..."):
+            with st.spinner("Validando y clasificando..."):
                 
                 # PASO 1: Extraer referencias de SolidWorks
                 referencias_sw = set()
@@ -112,57 +115,89 @@ if sw_data is not None and (bbdd_proyecto is not None or bbdd_estatica is not No
                 
                 st.info(f"✅ Leídas {len(referencias_sw)} referencias únicas de SolidWorks")
                 
-                # PASO 2: Extraer referencias de BBDD (fusionadas)
-                referencias_bbdd = set()
+                # PASO 2: Crear BBDD fusionada clasificada por tipo
+                referencias_clasificadas = {}
                 
-                # De BBDD Proyecto
-                if bbdd_proyecto is not None:
-                    # Buscar en todas las columnas ref_empresa
-                    for col in bbdd_proyecto.columns:
-                        if 'ref' in str(col).lower():
-                            for val in bbdd_proyecto[col]:
-                                try:
-                                    if pd.notna(val):
-                                        ref_num = int(float(str(val).strip()))
-                                        referencias_bbdd.add(ref_num)
-                                except:
-                                    pass
+                # De BBDD Proyecto - ELEMENTOS
+                if bbdd_proyecto is not None and 'Elementos.ref_empresa' in bbdd_proyecto.columns:
+                    for val in bbdd_proyecto['Elementos.ref_empresa']:
+                        try:
+                            if pd.notna(val):
+                                ref_num = int(float(str(val).strip()))
+                                if ref_num not in referencias_clasificadas:
+                                    referencias_clasificadas[ref_num] = {'es_elemento': False, 'es_articulo': False}
+                                referencias_clasificadas[ref_num]['es_elemento'] = True
+                        except:
+                            pass
                 
-                # De BBDD Estática
-                if bbdd_estatica is not None:
-                    # Buscar en RefEmpresa
-                    if 'RefEmpresa' in bbdd_estatica.columns:
-                        for val in bbdd_estatica['RefEmpresa']:
-                            try:
-                                if pd.notna(val):
-                                    ref_num = int(float(str(val).strip()))
-                                    referencias_bbdd.add(ref_num)
-                            except:
-                                pass
+                # De BBDD Proyecto - ARTÍCULOS
+                if bbdd_proyecto is not None and 'Proyectos.ref_empresa' in bbdd_proyecto.columns:
+                    for val in bbdd_proyecto['Proyectos.ref_empresa']:
+                        try:
+                            if pd.notna(val):
+                                ref_num = int(float(str(val).strip()))
+                                if ref_num not in referencias_clasificadas:
+                                    referencias_clasificadas[ref_num] = {'es_elemento': False, 'es_articulo': False}
+                                referencias_clasificadas[ref_num]['es_articulo'] = True
+                        except:
+                            pass
                 
-                st.info(f"✅ Encontradas {len(referencias_bbdd)} referencias únicas en BBDD fusionada")
+                # De BBDD Estática - ELEMENTOS (RefEmpresa)
+                if bbdd_estatica is not None and 'RefEmpresa' in bbdd_estatica.columns:
+                    for val in bbdd_estatica['RefEmpresa']:
+                        try:
+                            if pd.notna(val):
+                                ref_num = int(float(str(val).strip()))
+                                if ref_num not in referencias_clasificadas:
+                                    referencias_clasificadas[ref_num] = {'es_elemento': False, 'es_articulo': False}
+                                referencias_clasificadas[ref_num]['es_elemento'] = True
+                        except:
+                            pass
                 
-                # PASO 3: Comparar
+                st.info(f"✅ BBDD fusionada: {len(referencias_clasificadas)} referencias únicas clasificadas")
+                
+                # PASO 3: Comparar SolidWorks con BBDD fusionada
                 resultado = []
                 hay_count = 0
                 no_hay_count = 0
+                elemento_count = 0
+                articulo_count = 0
+                ambos_count = 0
                 
                 for ref_sw in sorted(referencias_sw):
-                    if ref_sw in referencias_bbdd:
+                    if ref_sw in referencias_clasificadas:
+                        data = referencias_clasificadas[ref_sw]
+                        
+                        # Determinar tipo
+                        if data['es_elemento'] and data['es_articulo']:
+                            tipo = "AMBOS"
+                            ambos_count += 1
+                        elif data['es_elemento']:
+                            tipo = "ELEMENTO"
+                            elemento_count += 1
+                        else:  # solo artículo
+                            tipo = "ARTÍCULO"
+                            articulo_count += 1
+                        
                         estado = "✓ HAY"
                         hay_count += 1
                     else:
                         estado = "✗ NO HAY"
+                        tipo = "NO EXISTE"
                         no_hay_count += 1
                     
                     resultado.append({
                         'Referencia': ref_sw,
-                        'Estado': estado
+                        'Estado': estado,
+                        'Tipo': tipo
                     })
                 
                 st.session_state.resultado = resultado
                 st.session_state.hay_count = hay_count
                 st.session_state.no_hay_count = no_hay_count
+                st.session_state.elemento_count = elemento_count
+                st.session_state.articulo_count = articulo_count
+                st.session_state.ambos_count = ambos_count
                 st.session_state.validado = True
         
         # ============= MOSTRAR RESULTADOS =============
@@ -170,10 +205,13 @@ if sw_data is not None and (bbdd_proyecto is not None or bbdd_estatica is not No
             st.divider()
             st.markdown("## 📊 RESULTADOS")
             
-            col1, col2, col3 = st.columns(3)
-            col1.metric("📊 Total Referencias", len(st.session_state.resultado))
-            col2.metric("✓ HAY en BBDD", st.session_state.hay_count)
-            col3.metric("✗ NO HAY en BBDD", st.session_state.no_hay_count)
+            col1, col2, col3, col4, col5, col6 = st.columns(6)
+            col1.metric("📊 Total", len(st.session_state.resultado))
+            col2.metric("✓ HAY", st.session_state.hay_count)
+            col3.metric("📦 Elementos", st.session_state.elemento_count)
+            col4.metric("🏷️ Artículos", st.session_state.articulo_count)
+            col5.metric("🔗 Ambos", st.session_state.ambos_count)
+            col6.metric("✗ NO HAY", st.session_state.no_hay_count)
             
             if len(st.session_state.resultado) > 0:
                 pct = (st.session_state.hay_count / len(st.session_state.resultado) * 100)
@@ -183,14 +221,21 @@ if sw_data is not None and (bbdd_proyecto is not None or bbdd_estatica is not No
             
             df = pd.DataFrame(st.session_state.resultado)
             
-            tab1, tab2, tab3 = st.tabs(["📋 TODAS", "✓ HAY EN BBDD", "✗ NO HAY EN BBDD"])
+            tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+                ["📋 TODAS", "✓ HAY", "📦 ELEMENTOS", "🏷️ ARTÍCULOS", "🔗 AMBOS", "✗ NO HAY"]
+            )
             
             with tab1:
                 st.markdown("### Validación Completa")
                 
                 for idx, row in df.iterrows():
-                    if '✓' in row['Estado']:
-                        st.success(f"✓ **{row['Referencia']}** → HAY")
+                    if row['Estado'] == "✓ HAY":
+                        if row['Tipo'] == "ELEMENTO":
+                            st.success(f"✓ **{row['Referencia']}** → 📦 ELEMENTO")
+                        elif row['Tipo'] == "ARTÍCULO":
+                            st.success(f"✓ **{row['Referencia']}** → 🏷️ ARTÍCULO")
+                        else:
+                            st.success(f"✓ **{row['Referencia']}** → 🔗 AMBOS")
                     else:
                         st.error(f"✗ **{row['Referencia']}** → NO HAY")
                 
@@ -222,11 +267,43 @@ if sw_data is not None and (bbdd_proyecto is not None or bbdd_estatica is not No
                 if len(df_hay) > 0:
                     st.markdown(f"### ✓ {len(df_hay)} Referencias en BBDD")
                     for idx, row in df_hay.iterrows():
-                        st.success(f"✓ **{row['Referencia']}**")
+                        if row['Tipo'] == "ELEMENTO":
+                            st.success(f"✓ **{row['Referencia']}** → 📦 ELEMENTO")
+                        elif row['Tipo'] == "ARTÍCULO":
+                            st.success(f"✓ **{row['Referencia']}** → 🏷️ ARTÍCULO")
+                        else:
+                            st.success(f"✓ **{row['Referencia']}** → 🔗 AMBOS")
                 else:
                     st.info("No hay referencias")
             
             with tab3:
+                df_elementos = df[df['Tipo'] == "ELEMENTO"]
+                if len(df_elementos) > 0:
+                    st.markdown(f"### 📦 {len(df_elementos)} Elementos en BBDD")
+                    for idx, row in df_elementos.iterrows():
+                        st.success(f"📦 **{row['Referencia']}** (ELEMENTO)")
+                else:
+                    st.info("No hay elementos")
+            
+            with tab4:
+                df_articulos = df[df['Tipo'] == "ARTÍCULO"]
+                if len(df_articulos) > 0:
+                    st.markdown(f"### 🏷️ {len(df_articulos)} Artículos en BBDD")
+                    for idx, row in df_articulos.iterrows():
+                        st.success(f"🏷️ **{row['Referencia']}** (ARTÍCULO)")
+                else:
+                    st.info("No hay artículos")
+            
+            with tab5:
+                df_ambos = df[df['Tipo'] == "AMBOS"]
+                if len(df_ambos) > 0:
+                    st.markdown(f"### 🔗 {len(df_ambos)} Referencias en AMBOS (ELEMENTO + ARTÍCULO)")
+                    for idx, row in df_ambos.iterrows():
+                        st.success(f"🔗 **{row['Referencia']}** (AMBOS)")
+                else:
+                    st.info("No hay referencias en ambos")
+            
+            with tab6:
                 df_no_hay = df[df['Estado'] == "✗ NO HAY"]
                 if len(df_no_hay) > 0:
                     st.markdown(f"### ✗ {len(df_no_hay)} Referencias NO en BBDD")
@@ -250,4 +327,4 @@ else:
     st.warning("⏳ Carga: SolidWorks + al menos una BBDD (Proyecto o Estática)")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: #999;'>🔍 Validador FINAL | SolidWorks vs BBDD Fusionada</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #999;'>🔍 Validador FINAL PRECISO | ELEMENTO/ARTÍCULO/AMBOS</p>", unsafe_allow_html=True)
